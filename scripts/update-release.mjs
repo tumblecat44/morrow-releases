@@ -40,7 +40,7 @@ export function selectRelease(releases) {
     if (previous?.priority === priority) throw new Error(`The release contains multiple ${arch} installers of the same type.`);
     if (!previous || priority > previous.priority) downloads.set(arch, { arch, url: asset.browser_download_url, priority });
   }
-  if (downloads.size === 0) throw new Error(`Attach a macOS .dmg or .zip file to ${release.tag_name} before publishing. The website keeps its previous download.`);
+  if (downloads.size === 0) throw new Error(`Attach a macOS .dmg or .zip file to ${release.tag_name} before publishing.`);
   return {
     version: release.tag_name.replace(/^v/, ''),
     downloads: ['universal', 'arm64', 'x64'].filter(arch => downloads.has(arch)).map(arch => {
