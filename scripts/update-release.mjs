@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 const repository = 'tumblecat44/morrow-releases';
 const emptyRelease = { version: null, downloads: [] };
 
-export function selectRelease(releases) {
+function stableReleases(releases) {
   const stable = releases.filter(release => !release.draft && !release.prerelease && /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(release.tag_name));
   stable.sort((a, b) => {
     const left = a.tag_name.replace(/^v/, '').split('.').map(BigInt);
@@ -14,6 +14,11 @@ export function selectRelease(releases) {
     }
     return Date.parse(b.published_at) - Date.parse(a.published_at);
   });
+  return stable;
+}
+
+export function selectRelease(releases) {
+  const stable = stableReleases(releases);
   if (stable.length === 0) return emptyRelease;
 
   const release = stable[0];
@@ -45,6 +50,28 @@ export function selectRelease(releases) {
   };
 }
 
+export async function selectAvailableRelease(releases, checkDownload, reportInvalid) {
+  for (const release of stableReleases(releases)) {
+    let manifest;
+    try {
+      manifest = selectRelease([release]);
+    } catch (error) {
+      reportInvalid(error.message);
+      continue;
+    }
+    let available = true;
+    for (const download of manifest.downloads) {
+      if (!await checkDownload(download.url)) {
+        reportInvalid(`The ${release.tag_name} ${download.arch} installer no longer exists.`);
+        available = false;
+        break;
+      }
+    }
+    if (available) return manifest;
+  }
+  return emptyRelease;
+}
+
 async function updateRelease() {
   if (!process.env.GH_TOKEN) throw new Error('GitHub did not provide the workflow token.');
   const releases = [];
@@ -58,11 +85,12 @@ async function updateRelease() {
     releases.push(...pageReleases);
     if (pageReleases.length < 100) break;
   }
-  const manifest = selectRelease(releases);
-  for (const download of manifest.downloads) {
-    const response = await fetch(download.url, { method: 'HEAD', signal: AbortSignal.timeout(30000) });
-    if (!response.ok) throw new Error(`The public ${download.arch} installer is unavailable (${response.status}). The website keeps its previous download.`);
-  }
+  const manifest = await selectAvailableRelease(releases, async url => {
+    const response = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(30000) });
+    if (response.status === 404 || response.status === 410) return false;
+    if (!response.ok) throw new Error(`GitHub could not verify a download (${response.status}). The website keeps its previous download.`);
+    return true;
+  }, message => console.warn(`::warning::${message.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')}`));
   await writeFile(new URL('../release.json', import.meta.url), JSON.stringify(manifest, null, 2) + '\n');
   console.log(manifest.version ? `The website manifest is ready for v${manifest.version}.` : 'The website manifest contains no public release.');
 }

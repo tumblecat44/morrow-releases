@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { selectRelease } from './update-release.mjs';
+import { selectRelease, selectAvailableRelease } from './update-release.mjs';
 
 function release(tag, names = ['Morrow-arm64.zip'], overrides = {}) {
   return {
@@ -38,4 +38,25 @@ test('a broken newest release fails instead of replacing the saved manifest', ()
 
 test('removing a release restores the remaining stable version', () => {
   assert.equal(selectRelease([release('v1.0.0')]).version, '1.0.0');
+});
+
+test('an incomplete new release preserves the previous valid download', async () => {
+  const warnings = [];
+  const result = await selectAvailableRelease([release('v2.0.0', []), release('v1.0.0')], async () => true, message => warnings.push(message));
+  assert.equal(result.version, '1.0.0');
+  assert.equal(warnings.length, 1);
+});
+
+test('deleting the only valid release clears a stale download even if broken releases remain', async () => {
+  const result = await selectAvailableRelease([release('v1.0.0', [])], async () => true, () => {});
+  assert.deepEqual(result, { version: null, downloads: [] });
+});
+
+test('a missing public asset rolls back to the next available release', async () => {
+  const result = await selectAvailableRelease([release('v2.0.0'), release('v1.0.0')], async url => !url.includes('/v2.0.0/'), () => {});
+  assert.equal(result.version, '1.0.0');
+});
+
+test('a temporary network failure aborts publication so the existing manifest stays intact', async () => {
+  await assert.rejects(selectAvailableRelease([release('v1.0.0')], async () => { throw new Error('Network unavailable'); }, () => {}), /Network unavailable/);
 });
