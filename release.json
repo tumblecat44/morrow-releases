@@ -1,13 +1,13 @@
 {
-  "version": "0.1.7",
+  "version": "0.1.8",
   "downloads": [
     {
       "arch": "arm64",
-      "url": "https://github.com/tumblecat44/morrow-releases/releases/download/v0.1.7/Morrow-0.1.7-arm64.dmg"
+      "url": "https://github.com/tumblecat44/morrow-releases/releases/download/v0.1.8/Morrow-0.1.8-arm64.dmg"
     },
     {
       "arch": "x64",
-      "url": "https://github.com/tumblecat44/morrow-releases/releases/download/v0.1.7/Morrow-0.1.7-x64.dmg"
+      "url": "https://github.com/tumblecat44/morrow-releases/releases/download/v0.1.8/Morrow-0.1.8-x64.dmg"
     }
   ]
 }
